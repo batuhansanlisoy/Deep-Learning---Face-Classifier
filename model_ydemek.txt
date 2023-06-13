@@ -1,0 +1,123 @@
+import cv2
+import numpy as np
+import os
+from sklearn.model_selection import train_test_split
+from keras.preprocessing.image import ImageDataGenerator
+from keras.utils import to_categorical
+import seaborn as sns
+from keras.models import Sequential
+from keras.layers import Dense, Conv2D,MaxPooling2D,Flatten,Dropout,BatchNormalization
+#import pickle
+import matplotlib.pyplot as plt
+from sklearn.metrics import confusion_matrix 
+from keras.optimizers import Adam
+from tensorflow.keras.optimizers import RMSprop
+from sklearn.preprocessing import label_binarize
+siniflar=[]
+images=[]
+
+
+#ronaldo ve messi klasörünü açıp içerisindeki fotografları images altında toplayadcam
+
+
+def preProcess(img):
+    img=cv2.cvtColor(img,cv2.COLOR_BGR2GRAY)
+    img=cv2.equalizeHist(img)
+    img=cv2.resize(img,(32,32))
+    img=img/255
+    return img
+
+
+
+os.chdir("C:/Users/user/Desktop/tubitak_face_detection/real_face/")
+isimler=os.listdir()
+
+for i in isimler:
+    x=os.listdir(i)
+    for j in x:
+        img=cv2.imread(str(i)+"/"+j)
+        images.append(img)
+        siniflar.append(i)
+       
+siniflar=np.array(siniflar)
+images=np.array(images)
+
+
+x_train,x_test,y_train,y_test=train_test_split(images,siniflar, test_size = 0.5, random_state = 42)
+x_train, x_validation, y_train, y_validation = train_test_split(x_train,y_train, test_size = 0.5, random_state = 42)
+
+
+
+x_train=np.array(list(map(preProcess,x_train)))
+x_test=np.array(list(map(preProcess,x_test)))
+x_validation=np.array(list(map(preProcess,x_validation)))
+
+
+x_train=x_train.reshape(-1,32,32,1) #-1 kaç tane resim varsa demek
+x_test=x_test.reshape(-1,32,32,1)
+x_validation=x_validation.reshape(-1,32,32,1)  #bunu yapmaktadi amaç verim (150,32,32) şekline geliyorsa bunu (150,32,32,1) şeklinde yazmak için
+
+x_train.shape
+
+
+
+# x_train=np.expand_dims(x_train, axis=3)  yukarıdaki işlemin farklı bir yolu
+
+
+dataGen=ImageDataGenerator(width_shift_range=0.1,
+                           height_shift_range=0.1,
+                           zoom_range=0.1,
+                           rotation_range=0.1)
+
+dataGen.fit(x_train)
+
+
+y_train=to_categorical(y_train,2) # 10 burda kaç tane sinifim oldugunu belirtiyor
+y_test=to_categorical(y_test,2)
+y_validation=to_categorical(y_validation,2)
+
+
+model=Sequential()
+
+model.add(Conv2D(input_shape=(32,32,1),filters=8,kernel_size=(5,5),activation="relu",padding="same"))
+model.add(MaxPooling2D(pool_size=(2,2)))
+
+
+
+model.add(Conv2D(filters=16,kernel_size=(3,3 ),activation="relu",padding="same"))
+model.add(MaxPooling2D(pool_size=(2,2)))
+
+model.add(Dropout(0.2))
+model.add(Flatten())
+
+model.add(Dense(units=256, activation="relu"))
+model.add(Dropout(0.2))
+
+model.add(Dense(units=2, activation="sigmoid"))
+#burdaki 10 tane sınıfm oldugu için 10 yazdım
+
+model.compile(loss="binary_crossentropy", optimizer="rmsprop", metrics=["accuracy"])
+
+batch_size=20 
+
+
+hist=model.fit_generator(dataGen.flow(x_train,y_train,batch_size=batch_size),
+                         validation_data=(x_validation,y_validation),
+                         epochs=150,steps_per_epoch=x_train.shape[0]//batch_size,shuffle=1)
+
+
+"""pickle_out=open("yeni.p","wb")
+pickle.dump(model,pickle_out)
+pickle_out.close()
+"""
+
+
+#kaydetme
+model.save("yeni_deneme.h5")
+
+
+
+k=hist.history
+
+dir(hist)
+
